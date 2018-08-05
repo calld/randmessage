@@ -11,25 +11,31 @@ import (
   "time"
 )
 
-var dicfilename string
+var dicfilenames []string
 
 func init() {
   if len(os.Args) < 2 {
     log.Fatalln("missing dictionary filename argument")
   }
-  dicfilename = os.Args[1]
+  dicfilenames = make([]string, 0, len(os.Args)-1)
+  for _, name := range os.Args[1:] {
+    dicfilenames = append(dicfilenames, name)
+  }
 }
 
 func main() {
-  dicfile, err := os.Open(dicfilename)
-  if err != nil {
-    log.Fatal(err.Error())
-  }
-  dec := json.NewDecoder(dicfile)
   gen := new(MessageGenerator)
-  err = dec.Decode(gen)
-  if err != nil {
-    log.Fatal(err.Error())
+  for _, dicfilename := range dicfilenames {
+    dicfile, err := os.Open(dicfilename)
+    if err != nil {
+      log.Fatal(err.Error())
+    }
+    dec := json.NewDecoder(dicfile)
+    err = dec.Decode(gen)
+    if err != nil {
+      log.Fatal(err.Error())
+    }
+    dicfile.Close()
   }
   fmt.Println(gen.Generate())
 }
@@ -37,7 +43,7 @@ func main() {
 type MessageGenerator struct {
   start string
   replace map[string][]string
-  die *rand.Rand
+  dice *rand.Rand
 }
 
 func (m *MessageGenerator) Generate() string {
@@ -58,7 +64,12 @@ func (m *MessageGenerator) Generate() string {
 }
 
 func (m *MessageGenerator) randphrase(key string) string {
-  return m.replace[key][m.die.Intn(len(m.replace[key]))]
+  defer func(){
+    if r := recover(); r != nil {
+      panic(fmt.Errorf("%s when attempting to get %s", r, key))
+    }
+  }()
+  return m.replace[key][m.dice.Intn(len(m.replace[key]))]
 }
 
 func (m *MessageGenerator) UnmarshalJSON(data []byte) (err error) {
@@ -77,15 +88,22 @@ func (m *MessageGenerator) UnmarshalJSON(data []byte) (err error) {
   }
   for k, v := range temp {
     if k == "__start__" {
+      if len(m.start) > 0 {
+        panic("multiple start strings, only one dictionary should have a non-empty __start__ field.")
+      }
       m.start = v.(string)
     } else {
-      m.replace[k] = make([]string, 0)
+      if m.replace[k] == nil {
+        m.replace[k] = make([]string, 0)
+      }
       for _, item := range v.([]interface{}) {
         m.replace[k] = append(m.replace[k], item.(string))
       }
     }
   }
-  m.die = rand.New(rand.NewSource(time.Now().Unix()))
+  if m.dice == nil {
+    m.dice = rand.New(rand.NewSource(time.Now().Unix()))
+  }
   return nil
 }
 
