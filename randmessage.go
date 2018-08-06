@@ -1,8 +1,6 @@
-package main
+package randmessage
 
 import (
-  "os"
-  "log"
   "fmt"
   "math/rand"
   "encoding/json"
@@ -10,35 +8,6 @@ import (
   "strings"
   "time"
 )
-
-var dicfilenames []string
-
-func init() {
-  if len(os.Args) < 2 {
-    log.Fatalln("missing dictionary filename argument")
-  }
-  dicfilenames = make([]string, 0, len(os.Args)-1)
-  for _, name := range os.Args[1:] {
-    dicfilenames = append(dicfilenames, name)
-  }
-}
-
-func main() {
-  gen := new(MessageGenerator)
-  for _, dicfilename := range dicfilenames {
-    dicfile, err := os.Open(dicfilename)
-    if err != nil {
-      log.Fatal(err.Error())
-    }
-    dec := json.NewDecoder(dicfile)
-    err = dec.Decode(gen)
-    if err != nil {
-      log.Fatal(err.Error())
-    }
-    dicfile.Close()
-  }
-  fmt.Println(gen.Generate())
-}
 
 type MessageGenerator struct {
   start string
